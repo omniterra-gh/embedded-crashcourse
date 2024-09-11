@@ -111,6 +111,86 @@ I2C device found at address 0x3C  !
 I2C device found at address 0x68  !
 done
 ```
+# AHT20 Temperature and Humidity Sensor Project
+
+## Overview
+
+This project uses the AHT20 sensor to measure temperature and humidity. It's designed to run on Arduino-compatible boards using the PlatformIO development environment. The AHT20 is a high-precision, fully calibrated sensor for measuring relative humidity and temperature, communicating over the I2C interface.
+
+## Features
+
+- Initializes and reads data from the AHT20 sensor
+- Displays temperature in Celsius and relative humidity percentage
+- Provides error handling for failed readings
+- Compatible with PlatformIO and Arduino frameworks
+
+## Hardware Requirements
+
+- Any Arduino-compatible board (e.g., Arduino Uno, ESP32, etc.)
+- AHT20 Temperature and Humidity Sensor
+- Connecting wires
+
+## Wiring
+
+Connect the AHT20 sensor to your board as follows:
+
+- VCC to 3.3V
+- GND to GND
+- SCL to the SCL pin of your board (A5 on most Arduino boards)
+- SDA to the SDA pin of your board (A4 on most Arduino boards)
+
+## Software Setup
+
+1. Install PlatformIO Core or PlatformIO IDE extension for Visual Studio Code.
+2. Create a new project in PlatformIO for your specific board.
+3. Replace the contents of `src/main.cpp` with the provided code.
+4. Ensure your `platformio.ini` file includes the following (adjust for your specific board):
+
+```ini
+[env:your_board]
+platform = atmelavr
+board = uno
+framework = arduino
+monitor_speed = 9600
+```
+
+## Usage
+
+1. Connect your board to your computer.
+2. Build and upload the project using PlatformIO.
+3. Open the Serial Monitor (baud rate 9600) to view the temperature and humidity readings.
+
+## Output
+
+The program will output temperature and humidity readings every 2 seconds in the following format:
+
+```
+Temperature: XX.XX °C, Humidity: YY.YY %
+```
+
+If there's an error reading the sensor, you'll see:
+
+```
+Failed to read from AHT20 sensor!
+```
+
+## Troubleshooting
+
+- Ensure all connections are secure and correct.
+- Verify that you're using a 3.3V power supply for the AHT20 sensor.
+- Check that the I2C address in the code matches your sensor (0x38 is standard).
+
+## Contributing
+
+Feel free to fork this project and submit pull requests with improvements or bug fixes.
+
+## License
+
+This project is open source and available under the [MIT License](https://opensource.org/licenses/MIT).
+
+## Acknowledgments
+
+- Thanks to the Arduino and PlatformIO communities for their invaluable resources and support.
 
 In this example, two I2C devices were found at addresses 0x3C and 0x68.
 
