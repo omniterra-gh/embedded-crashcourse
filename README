@@ -2,6 +2,7 @@
 
 This project provides an Arduino sketch to scan for I2C devices connected to your Arduino board. It's a useful tool for identifying the addresses of I2C devices in your setup.
 
+
 ## Table of Contents
 1. [Hardware Requirements](#hardware-requirements)
 2. [Wiring Diagram](#wiring-diagram)
