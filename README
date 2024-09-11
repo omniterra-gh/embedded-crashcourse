@@ -1,1 +1,123 @@
-This is I2C scanner example
+# Arduino I2C Address Scanner
+
+This project provides an Arduino sketch to scan for I2C devices connected to your Arduino board. It's a useful tool for identifying the addresses of I2C devices in your setup.
+
+## Table of Contents
+1. [Hardware Requirements](#hardware-requirements)
+2. [Wiring Diagram](#wiring-diagram)
+3. [Software Requirements](#software-requirements)
+4. [Installation](#installation)
+5. [Usage](#usage)
+6. [Example Output](#example-output)
+7. [Troubleshooting](#troubleshooting)
+
+## Hardware Requirements
+- Arduino board (e.g., Arduino Uno, Nano, Mega)
+- I2C device(s) to scan
+- Jumper wires
+
+## Wiring Diagram
+
+```
+     Arduino                I2C Device
+     -------                ----------
+     5V     --------------- VCC
+     GND    --------------- GND
+     SDA    --------------- SDA
+     SCL    --------------- SCL
+```
+
+Note: On most Arduino boards, the SDA (data line) and SCL (clock line) are:
+- For Arduino Uno, Nano, Pro Mini: A4 (SDA), A5 (SCL)
+- For Arduino Mega: 20 (SDA), 21 (SCL)
+- For Arduino Leonardo: 2 (SDA), 3 (SCL)
+
+## Software Requirements
+- Arduino IDE (version 1.8.x or later)
+- Wire library (included with Arduino IDE)
+
+## Installation
+1. Open the Arduino IDE
+2. Create a new sketch
+3. Copy and paste the following code into the sketch:
+
+```cpp
+#include <Wire.h>
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  while (!Serial);
+  Serial.println("\nI2C Scanner");
+}
+
+void loop() {
+  byte error, address;
+  int nDevices;
+
+  Serial.println("Scanning...");
+
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("I2C device found at address 0x");
+      if (address < 16) 
+        Serial.print("0");
+      Serial.print(address,HEX);
+      Serial.println("  !");
+
+      nDevices++;
+    }
+    else if (error == 4) {
+      Serial.print("Unknown error at address 0x");
+      if (address < 16) 
+        Serial.print("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0)
+    Serial.println("No I2C devices found\n");
+  else
+    Serial.println("done\n");
+
+  delay(5000);  // Wait 5 seconds for next scan
+}
+```
+
+4. Save the sketch (e.g., "I2C_Scanner.ino")
+
+## Usage
+1. Connect your I2C device(s) to the Arduino according to the wiring diagram
+2. Connect your Arduino to your computer via USB
+3. Upload the sketch to your Arduino board
+4. Open the Serial Monitor (Tools > Serial Monitor)
+5. Set the baud rate to 9600
+6. The scanner will start automatically and scan for I2C devices every 5 seconds
+
+## Example Output
+```
+I2C Scanner
+
+Scanning...
+I2C device found at address 0x3C  !
+I2C device found at address 0x68  !
+done
+
+Scanning...
+I2C device found at address 0x3C  !
+I2C device found at address 0x68  !
+done
+```
+
+In this example, two I2C devices were found at addresses 0x3C and 0x68.
+
+## Troubleshooting
+- If no devices are found, double-check your wiring connections
+- Ensure that your I2C devices are powered correctly
+- Some I2C devices may require pull-up resistors on the SDA and SCL lines
+- If you're using an Arduino board with different SDA and SCL pins, modify the `Wire.begin()` call in the setup() function accordingly
+
+For more information on I2C communication with Arduino, refer to the [official Arduino Wire Library documentation](https://www.arduino.cc/en/reference/wire).
