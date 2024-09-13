@@ -1,96 +1,184 @@
-// src/main.cpp
 #include <Arduino.h>
+#include <U8g2lib.h>
 #include <Wire.h>
-
-// Define the I2C address of the AHT20 sensor
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+ 
 #define AHT20_ADDRESS 0x38
-
-// Function prototype for reading the AHT20 sensor
-bool readAHT20(float *temperature, float *humidity);
-
+#define AHT20_INIT_CMD 0xBE
+ 
+// Add debug mode flag
+#define DEBUG_MODE 0
+ 
+U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+ 
+TinyGPSPlus gps;
+SoftwareSerial ss(20, 21); // RX, TX
+ //prototypes
+void initAHT20();
+void readAHT20(float &temp, float &hum);
+int readA0();
+void readGPS(float &lat, float &lon);
+void displayData(float temp, float hum, int a0, float lat, float lon);
+ 
 void setup() {
-  // Initialize I2C communication
-  Wire.begin();
-  
-  // Initialize serial communication for debugging and output
+  #if DEBUG_MODE
   Serial.begin(9600);
-  
-  // Wait for 1 second to allow the sensor to power up and stabilize
-  delay(1000);
-  
-  // Initialize the AHT20 sensor
-  Wire.beginTransmission(AHT20_ADDRESS);
-  Wire.write(0xBE);  // Initialization command
-  Wire.write(0x08);  // Calibration command parameter 1
-  Wire.write(0x00);  // Calibration command parameter 2
-  Wire.endTransmission();
-  
-  // Wait for 10ms to ensure initialization is complete
-  delay(10);
-  
-  Serial.println("AHT20 Sensor Initialized");
+  #endif
+  u8g2.begin();
+  Wire.begin();
+  ss.begin(9600);
+ 
+  initAHT20();
+ 
+  #if DEBUG_MODE
+  Serial.println(F("System initialized"));
+  #endif
 }
-
+ 
 void loop() {
-  // Variables to store temperature and humidity readings
-  float temperature, humidity;
-  
-  // Attempt to read data from the AHT20 sensor
-  if (readAHT20(&temperature, &humidity)) {
-    // If successful, print the readings
-    Serial.print("Temperature: ");
-    Serial.print(temperature, 2);  // Print with 2 decimal places
-    Serial.print(" °C, Humidity: ");
-    Serial.print(humidity, 2);     // Print with 2 decimal places
-    Serial.println(" %");
-  } else {
-    // If reading fails, print an error message
-    Serial.println("Failed to read from AHT20 sensor!");
-  }
-  
-  // Wait for 2 seconds before the next reading
-  delay(2000);
+  float temperature, humidity, latitude, longitude;
+  int analogValue;
+ 
+  readAHT20(temperature, humidity);
+  analogValue = readA0();
+  readGPS(latitude, longitude);
+ 
+  displayData(temperature, humidity, analogValue, latitude, longitude);
+ 
+  // delay(1000);
 }
-
-bool readAHT20(float *temperature, float *humidity) {
-  uint8_t data[6];  // Array to store raw data from sensor
-  
-  // Step 1: Trigger a new measurement
+ 
+void initAHT20() {
   Wire.beginTransmission(AHT20_ADDRESS);
-  Wire.write(0xAC);  // Measurement trigger command
-  Wire.write(0x33);  // Measurement command parameter 1
-  Wire.write(0x00);  // Measurement command parameter 2
+  Wire.write(AHT20_INIT_CMD);
+  Wire.write(0x08);
+  Wire.write(0x00);
   Wire.endTransmission();
-  
-  // Wait for 80ms for the measurement to complete
-  delay(80);
-  
-  // Step 2: Read the measurement data
-  Wire.requestFrom(AHT20_ADDRESS, 6);  // Request 6 bytes of data
-  if (Wire.available() != 6) {
-    return false;  // If we don't get 6 bytes, return false to indicate failure
-  }
-  
-  // Read all 6 bytes into our data array
+  delay(10);  // Wait for sensor to initialize
+}
+ 
+void readAHT20(float &temp, float &hum) {
+  uint8_t data[6];
+ 
+  Wire.beginTransmission(AHT20_ADDRESS);
+  Wire.write(0xAC);  // Trigger measurement
+  Wire.write(0x33);
+  Wire.write(0x00);
+  Wire.endTransmission();
+ 
+  delay(80);  // Wait for measurement to complete
+ 
+  Wire.requestFrom(AHT20_ADDRESS, 6);
   for (int i = 0; i < 6; i++) {
     data[i] = Wire.read();
   }
-  
-  // Step 3: Check the status bit
-  if (data[0] & 0x80) {
-    return false;  // If the high bit is set, the device is busy, so return false
+ 
+  hum = ((uint32_t)data[1] << 12 | (uint32_t)data[2] << 4 | (data[3] >> 4)) * 100.0 / 0x100000;
+  temp = ((uint32_t)(data[3] & 0x0F) << 16 | (uint32_t)data[4] << 8 | data[5]) * 200.0 / 0x100000 - 50;
+}
+ 
+int readA0() {
+  return analogRead(A0);
+}
+ 
+void readGPS(float &lat, float &lon) {
+  unsigned long startTime = millis();
+  bool newData = false;
+ 
+  while (millis() - startTime < 1000) {
+    while (ss.available() > 0) {
+      if (gps.encode(ss.read())) {
+        newData = true;
+      }
+    }
+ 
+    if (newData) {
+      if (gps.location.isValid()) {
+        lat = gps.location.lat();
+        lon = gps.location.lng();
+ 
+        #if DEBUG_MODE
+        Serial.println(F("GPS Debug Information:"));
+        Serial.print(F("Latitude: "));
+        Serial.println(lat, 6);
+        Serial.print(F("Longitude: "));
+        Serial.println(lon, 6);
+        #endif
+      } else {
+        #if DEBUG_MODE
+        Serial.println(F("Location: INVALID"));
+        #endif
+      }
+ 
+      #if DEBUG_MODE
+      Serial.print(F("Satellites in view: "));
+      Serial.println(gps.satellites.value());
+      Serial.print(F("HDOP: "));
+      Serial.println(gps.hdop.hdop());
+ 
+      if (gps.altitude.isValid()) {
+        Serial.print(F("Altitude: "));
+        Serial.print(gps.altitude.meters());
+        Serial.println(F(" meters"));
+      } else {
+        Serial.println(F("Altitude: INVALID"));
+      }
+ 
+      if (gps.date.isValid() && gps.time.isValid()) {
+        Serial.printf("Date/Time: %02d/%02d/%04d %02d:%02d:%02d\n",
+                      gps.date.month(), gps.date.day(), gps.date.year(),
+                      gps.time.hour(), gps.time.minute(), gps.time.second());
+      } else {
+        Serial.println(F("Date/Time: INVALID"));
+      }
+ 
+      Serial.println();
+      #endif
+ 
+      newData = false;
+ 
+      if (gps.location.isValid()) {
+        return;  // Exit the function if we have a valid location
+      }
+    }
   }
-  
-  // Step 4: Convert raw data to temperature and humidity values
-  
-  // Humidity is stored in bits 12-19 of data[1] and all bits of data[2]
-  uint32_t h = ((uint32_t)data[1] << 12) | ((uint32_t)data[2] << 4) | (data[3] >> 4);
-  // Temperature is stored in the lower 4 bits of data[3] and all bits of data[4] and data[5]
-  uint32_t t = ((uint32_t)(data[3] & 0x0F) << 16) | ((uint32_t)data[4] << 8) | data[5];
-  
-  // Convert raw values to actual temperature and humidity
-  *humidity = (float)h * 100 / 0x100000;  // Formula from datasheet
-  *temperature = (float)t * 200 / 0x100000 - 50;  // Formula from datasheet
-  
-  return true;  // Return true to indicate successful reading
+ 
+  lat = lon = 0.0; // Invalid or no fix
+  #if DEBUG_MODE
+  Serial.println(F("GPS: No valid data received in time."));
+  #endif
+}
+ 
+void displayData(float temp, float hum, int a0, float lat, float lon) {
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+ 
+    u8g2.setCursor(0, 10);
+    u8g2.print(F("Temp: "));
+    u8g2.print(temp);
+    u8g2.print(F("C"));
+ 
+    u8g2.setCursor(0, 20);
+    u8g2.print(F("Hum: "));
+    u8g2.print(hum);
+    u8g2.print(F("%"));
+ 
+    u8g2.setCursor(0, 30);
+    u8g2.print(F("A0: "));
+    u8g2.print(a0);
+ 
+    u8g2.setCursor(0, 40);
+    u8g2.print(F("Lat: "));
+    u8g2.print(lat, 6);
+ 
+    u8g2.setCursor(0, 50);
+    u8g2.print(F("Lon: "));
+    u8g2.print(lon, 6);
+ 
+    int barWidth = map(a0, 0, 1023, 0, 128);
+    u8g2.drawFrame(0, 55, 128, 9);
+    u8g2.drawBox(0, 55, barWidth, 9);
+  } while (u8g2.nextPage());
 }
